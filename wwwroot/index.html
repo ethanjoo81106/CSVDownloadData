@@ -9,29 +9,30 @@
     <body>
 
         <h1>BPM Export Portal</h1>
-        <p>This site lets you download your exported heart rate CSV data.</p>
+        <button id="testUploadBtn">Upload test CSV (simulate watch)</button>
+        <p>This site will allow you to download your exported heart rate CSV files.</p>
 
-        <section>
-            <h2>Export all data</h2>
-            <p>Download a CSV containing every recorded sample.</p>
-            <button id="downloadAllBtn">Download full CSV</button>
-        </section>
+        <h2>Your Exports</h2>
 
-        <section>
-            <h2>Export a date range</h2>
-            <p>Select a time range and download just those samples.</p>
-            <form id="rangeForm">
-                <label>
-                    From:
-                    <input type="datetime-local" id="fromInput" required>
-                </label>
-                <label>
-                    To:
-                    <input type="datetime-local" id="toInput" required>
-                </label>
-                <button type="submit">Download CSV for range</button>
-            </form>
-        </section>
+        <!-- Status text -->
+        <p id="statusText">Checking for exported data…</p>
+
+        <!-- Download-all button starts disabled until we know data exists -->
+        <button id="downloadAllBtn" disabled>Download full CSV</button>
+
+        <h2>Export a date range</h2>
+
+        <form id="rangeForm">
+            <label>
+                From:
+                <input type="datetime-local" id="fromInput" required />
+            </label>
+            <label>
+                To:
+                <input type="datetime-local" id="toInput" required />
+            </label>
+            <button type="submit">Download CSV for range</button>
+        </form>
 
         <p id="errorMessage" class="hidden"></p>
 
