@@ -4,7 +4,9 @@
     <meta charset="utf-8" />
     <title>BPM Export Portal</title>
     <link rel="stylesheet" href="styling.css" />
-    <script src="app.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script type="module" src="app.js"></script>
 </head>
     <body>
 
@@ -14,11 +16,13 @@
 
         <h2>Your Exports</h2>
 
-        <!-- Status text -->
         <p id="statusText">Checking for exported data…</p>
 
-        <!-- Download-all button starts disabled until we know data exists -->
         <button id="downloadAllBtn" disabled>Download full CSV</button>
+
+        <h2>Latest BPM data</h2>
+        <p id="graphStatus">No data received yet.</p>
+        <canvas id="bpmChart" width="600" height="300"></canvas>
 
         <h2>Export a date range</h2>
 
@@ -33,6 +37,11 @@
             </label>
             <button type="submit">Download CSV for range</button>
         </form>
+
+        <h2>Upload a file</h2>
+
+        <input type="file" id="csvUploadInput" accept=".csv">
+        <button id="uploadCsvFileBtn">Upload CSV File</button>
 
         <p id="errorMessage" class="hidden"></p>
 

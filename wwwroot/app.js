@@ -1,37 +1,36 @@
+import {
+    uploadCsv,
+    fetchExportStatus,
+    getFullExportUrl,
+    getRangeExportUrl,
+} from "./api.js";
+
 const API_BASE = "http://localhost:8080";
 
 document.addEventListener("DOMContentLoaded", () => {
-
     const statusText = document.getElementById("statusText");
     const downloadAllBtn = document.getElementById("downloadAllBtn");
     const rangeForm = document.getElementById("rangeForm");
     const fromInput = document.getElementById("fromInput");
     const toInput = document.getElementById("toInput");
     const errorMessage = document.getElementById("errorMessage");
-
     const testUploadBtn = document.getElementById("testUploadBtn");
 
+    const graphStatus = document.getElementById("graphStatus");
+    const bpmCanvas = document.getElementById("bpmChart");
+
+    let bpmChart = null; // will hold the Chart.js instance
+
     testUploadBtn.addEventListener("click", async () => {
-        const csv = "timeMillis,iso8601,bpm\n" +
+        const csv =
+            "timeMillis,iso8601,bpm\n" +
             "1710600000000,2024-03-16T10:00:00Z,80\n" +
             "1710600060000,2024-03-16T10:01:00Z,82\n";
 
         try {
-            const resp = await fetch(`${API_BASE}/api/bpm/upload`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "text/csv",
-                },
-                body: csv,
-            });
-
-            if (!resp.ok) {
-                alert("Upload failed: " + (await resp.text()));
-                return;
-            }
-
+            await uploadCsv(csv);
             alert("Test CSV uploaded!");
-            checkExportStatus();
+            await checkExportStatus();
         } catch (e) {
             console.error(e);
             alert("Upload error: " + e.message);
@@ -41,56 +40,57 @@ document.addEventListener("DOMContentLoaded", () => {
     const showError = (msg) => {
         errorMessage.textContent = msg;
         errorMessage.classList.remove("hidden");
-    }
+    };
 
     const clearError = () => {
         errorMessage.textContent = "";
         errorMessage.classList.add("hidden");
-    }
+    };
 
     const setEnabled = (enabled) => {
         downloadAllBtn.disabled = !enabled;
         fromInput.disabled = !enabled;
         toInput.disabled = !enabled;
         rangeForm.querySelector("button[type='submit']").disabled = !enabled;
-    }
+    };
 
-    async function checkExportStatus(){
+    async function checkExportStatus() {
         try {
-            statusText.textContent = "Checking for exported data..."
-            setEnabled(false)
-            clearError()
+            statusText.textContent = "Checking for exported data...";
+            setEnabled(false);
+            clearError();
 
             const response = await fetch(`${API_BASE}/api/bpm/status`, {
-                cache: "no-store",
+                cache: "no-store"
             });
 
             if (!response.ok) {
-                statusText.textContent = "Could not contact the export server.";
-                return;
+                throw new Error("Could not contact the export server.");
             }
 
             const text = (await response.text()).trim();
 
-
             if (text === "ready") {
                 statusText.textContent = "Export found. You can download it now.";
                 setEnabled(true);
+                fetchAndShowLatestCsv();
             } else {
-                statusText.textContent = "No exports yet. On your watch, open the app and tap “Export” first.";
+                statusText.textContent =
+                    "No exports yet. On your watch, open the app and tap “Export” first.";
                 setEnabled(false);
+                graphStatus.textContent = "No data received yet.";
             }
         } catch (error) {
             console.error(error);
-            statusText.textContent = "Error checking export status.";
+            statusText.textContent = error.message || "Error checking export status.";
             setEnabled(false);
         }
     }
 
     downloadAllBtn.addEventListener("click", () => {
         clearError();
-        window.location.href = `${API_BASE}/api/bpm/export`;
-    })
+        window.location.href = getFullExportUrl();
+    });
 
     rangeForm.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -117,12 +117,172 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        const url = `${API_BASE}/api/bpm/export?start=${startMillis}&end=${endMillis}`;
+        const url = getRangeExportUrl(startMillis, endMillis);
         window.location.href = url;
     });
 
-    checkExportStatus()
+    function parseCsv(csvText) {
+        const lines = csvText.split(/\n/);
 
+        if (lines.length <=1) {
+            return [];
+        }
+
+        const points = [];
+
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+
+            if (!line){
+                continue;
+            }
+
+            const [timeMillis, iso8601, bpmStr] =  line.split(",");
+            const bpm = Number(bpmStr);
+
+            if (Number.isNaN(bpm)) {
+                continue;
+            }
+
+            let time;
+
+            if (iso8601) {
+                time = new Date(iso8601);
+            } else if (timeMillis){
+                time = new Date(Number(timeMillis));
+            } else {
+                continue;
+            }
+
+            if (Number.isNaN(time.getTime())) {
+                continue;
+            }
+
+            points.push({time, bpm});
+        }
+
+        points.sort((a, b) => {
+            a.time - b.time
+        })
+
+        return points;
+    }
+
+    function renderBpmChart(points) {
+        if (!bpmCanvas) return;
+
+        if (!points.length) {
+            graphStatus.textContent = "Data received, but no usable rows in CSV.";
+            return;
+        }
+
+        const labels = points.map(p =>
+            p.time.toLocaleString(undefined, {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit"
+            })
+        );
+
+        const data = points.map(p => p.bpm);
+
+        const ctx = bpmCanvas.getContext("2d");
+
+        if (bpmChart) {
+            bpmChart.data.labels = labels;
+            bpmChart.data.datasets[0].data = data;
+            bpmChart.update();
+        } else {
+            bpmChart = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: "BPM",
+                            data,
+                            tension: 0.2,
+                            pointRadius: 0,
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: "#e6edf3"
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                autoSkip: true,
+                                maxTicksLimit: 20,
+                                color: "#e6edf3"
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                color: "#e6edf3"
+                            },
+                            title: {
+                                display: true,
+                                text: "BPM",
+                                color: "#e6edf3"
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        graphStatus.textContent = `Showing ${points.length} data points.`;
+    }
+
+    async function fetchAndShowLatestCsv() {
+        try {
+            graphStatus.textContent = "Loading latest data...";
+            const response = await fetch(`${API_BASE}/api/bpm/export`, {
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                throw new Error(`Could not fetch latest CSV (status ${response.status}).`);
+            }
+
+            const csvText = await response.text();
+            const points = parseCsv(csvText);
+            renderBpmChart(points);
+        } catch (err) {
+            console.error(err);
+            graphStatus.textContent = "Error loading data: " + (err.message || "Unknown error");
+        }
+    }
+
+    document.getElementById("uploadCsvFileBtn").addEventListener("click", async () => {
+        const fileInput = document.getElementById("csvUploadInput");
+        if (!fileInput.files.length) {
+            alert("Choose a CSV first.");
+            return;
+        }
+
+        const file = fileInput.files[0];
+        const csvText = await file.text();
+
+        try {
+            await uploadCsv(csvText);
+            alert("Uploaded test CSV!");
+            const points = parseCsv(csvText);
+            renderBpmChart(points);
+        } catch (e) {
+            alert("Upload failed: " + e.message);
+        }
+    });
+
+    checkExportStatus();
     setInterval(checkExportStatus, 10000);
-
 });
