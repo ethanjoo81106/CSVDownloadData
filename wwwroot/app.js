@@ -18,8 +18,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const graphStatus = document.getElementById("graphStatus");
     const bpmCanvas = document.getElementById("bpmChart");
+    const selectedRangeText = document.getElementById("selectedRangeText");
+    const downloadSelectedBtn = document.getElementById("downloadSelectedBtn");
 
-    let bpmChart = null; // will hold the Chart.js instance
+    let bpmChart = null;
+    let currentPoints = [];
+
+    let selectedStartMillis = null;
+    let selectedEndMillis = null;
 
     testUploadBtn.addEventListener("click", async () => {
         const csv =
@@ -30,6 +36,9 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             await uploadCsv(csv);
             alert("Test CSV uploaded!");
+            // Show the sample on the graph immediately
+            const points = parseCsv(csv);
+            renderBpmChart(points);
             await checkExportStatus();
         } catch (e) {
             console.error(e);
@@ -124,7 +133,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function parseCsv(csvText) {
         const lines = csvText.split(/\n/);
 
-        if (lines.length <=1) {
+        if (lines.length <= 1) {
             return [];
         }
 
@@ -161,15 +170,16 @@ document.addEventListener("DOMContentLoaded", () => {
             points.push({time, bpm});
         }
 
-        points.sort((a, b) => {
-            a.time - b.time
-        })
+        points.sort((a, b) => a.time - b.time);
 
         return points;
     }
 
+
     function renderBpmChart(points) {
         if (!bpmCanvas) return;
+
+        currentPoints = points.slice();
 
         if (!points.length) {
             graphStatus.textContent = "Data received, but no usable rows in CSV.";
@@ -281,6 +291,130 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (e) {
             alert("Upload failed: " + e.message);
         }
+    });
+
+    let isDragging = false;
+    let dragStartX = null;
+    let dragEndX = null;
+
+    function drawSelectionOverlay() {
+        if (!bpmChart || dragStartX === null || dragEndX === null) return;
+
+        const ctx = bpmChart.ctx;
+        const chartArea = bpmChart.chartArea;
+
+        bpmChart.update("none");
+
+        let x1 = Math.min(dragStartX, dragEndX);
+        let x2 = Math.max(dragStartX, dragEndX);
+        x1 = Math.max(x1, chartArea.left);
+        x2 = Math.min(x2, chartArea.right);
+
+        if (x2 <= x1) return;
+
+        ctx.save();
+        ctx.fillStyle = "rgba(255,255,255,0.15)";
+        ctx.fillRect(
+            x1,
+            chartArea.top,
+            x2 - x1,
+            chartArea.bottom - chartArea.top
+        );
+        ctx.restore();
+    }
+
+    function clearSelection() {
+        dragStartX = null;
+        dragEndX = null;
+        selectedStartMillis = null;
+        selectedEndMillis = null;
+        downloadSelectedBtn.disabled = true;
+        selectedRangeText.textContent =
+            "No range selected. Click and drag on the chart to select a range to download.";
+    }
+
+    function finishSelection() {
+        if (!isDragging) return;
+        isDragging = false;
+
+        if (!bpmChart || !currentPoints.length || dragStartX === null || dragEndX === null) {
+            clearSelection();
+            return;
+        }
+
+        const xScale = bpmChart.scales.x;
+        const chartArea = bpmChart.chartArea;
+
+        let x1 = Math.min(dragStartX, dragEndX);
+        let x2 = Math.max(dragStartX, dragEndX);
+        x1 = Math.max(x1, chartArea.left);
+        x2 = Math.min(x2, chartArea.right);
+
+        if (x2 - x1 < 5) {
+            selectedRangeText.textContent = "Selection too small. Drag a wider area.";
+            clearSelection();
+            return;
+        }
+
+        let startIndex = Math.floor(xScale.getValueForPixel(x1));
+        let endIndex = Math.ceil(xScale.getValueForPixel(x2));
+
+        if (startIndex < 0) startIndex = 0;
+        if (endIndex >= currentPoints.length) endIndex = currentPoints.length - 1;
+        if (endIndex <= startIndex) {
+            selectedRangeText.textContent = "Selection invalid.";
+            clearSelection();
+            return;
+        }
+
+        const startPoint = currentPoints[startIndex];
+        const endPoint = currentPoints[endIndex];
+
+        selectedStartMillis = startPoint.time.getTime();
+        selectedEndMillis = endPoint.time.getTime();
+
+        selectedRangeText.textContent =
+            `Selected ${startPoint.time.toLocaleString()} → ${endPoint.time.toLocaleString()}. ` +
+            `Click "Download selected range" to download.`;
+
+        downloadSelectedBtn.disabled = false;
+    }
+
+    if (bpmCanvas) {
+        bpmCanvas.addEventListener("mousedown", (event) => {
+            if (!bpmChart || !currentPoints.length) return;
+            const rect = bpmCanvas.getBoundingClientRect();
+            isDragging = true;
+            dragStartX = event.clientX - rect.left;
+            dragEndX = dragStartX;
+        });
+
+        bpmCanvas.addEventListener("mousemove", (event) => {
+            if (!isDragging) return;
+            const rect = bpmCanvas.getBoundingClientRect();
+            dragEndX = event.clientX - rect.left;
+            drawSelectionOverlay();
+        });
+
+        bpmCanvas.addEventListener("mouseup", () => {
+            finishSelection();
+        });
+
+        bpmCanvas.addEventListener("mouseleave", () => {
+            if (isDragging) {
+                finishSelection();
+            }
+        });
+    }
+
+    downloadSelectedBtn.addEventListener("click", () => {
+        if (selectedStartMillis == null || selectedEndMillis == null) {
+            alert("No range selected yet.");
+            return;
+        }
+
+        const url = getRangeExportUrl(selectedStartMillis, selectedEndMillis);
+        window.location.href = url;
     });
 
     checkExportStatus();

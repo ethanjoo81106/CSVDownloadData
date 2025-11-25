@@ -14,6 +14,11 @@
         <button id="testUploadBtn">Upload test CSV (simulate watch)</button>
         <p>This site will allow you to download your exported heart rate CSV files.</p>
 
+        <h2>Upload a file</h2>
+
+        <input type="file" id="csvUploadInput" accept=".csv">
+        <button id="uploadCsvFileBtn">Upload CSV File</button>
+
         <h2>Your Exports</h2>
 
         <p id="statusText">Checking for exported data…</p>
@@ -23,6 +28,12 @@
         <h2>Latest BPM data</h2>
         <p id="graphStatus">No data received yet.</p>
         <canvas id="bpmChart" width="600" height="300"></canvas>
+
+        <p id="selectedRangeText">
+            No range selected. Click and drag on the chart to select a range to download.
+        </p>
+
+        <button id="downloadSelectedBtn" disabled>Download selected range</button>
 
         <h2>Export a date range</h2>
 
@@ -37,11 +48,6 @@
             </label>
             <button type="submit">Download CSV for range</button>
         </form>
-
-        <h2>Upload a file</h2>
-
-        <input type="file" id="csvUploadInput" accept=".csv">
-        <button id="uploadCsvFileBtn">Upload CSV File</button>
 
         <p id="errorMessage" class="hidden"></p>
 
