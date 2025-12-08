@@ -21,6 +21,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const selectedRangeText = document.getElementById("selectedRangeText");
     const downloadSelectedBtn = document.getElementById("downloadSelectedBtn");
 
+    const serverOfflineMessage = document.getElementById("serverOfflineMessage");
+    const serverDependentSection = document.getElementById("serverDependentSection");
+
     let bpmChart = null;
     let currentPoints = [];
 
@@ -46,6 +49,31 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    const markServerOnline = () => {
+        if (serverOfflineMessage) {
+            serverOfflineMessage.classList.add("hidden");
+        }
+        if (serverDependentSection) {
+            serverDependentSection.classList.remove("hidden");
+        }
+    };
+
+    const markServerOffline = () => {
+        if (serverOfflineMessage) {
+            serverOfflineMessage.textContent =
+                "The export server isn’t running. Start it, then reload this page. " +
+                "You can still upload a CSV file and view it on the graph.";
+            serverOfflineMessage.classList.remove("hidden");
+        }
+        if (serverDependentSection) {
+            serverDependentSection.classList.add("hidden");
+        }
+        setEnabled(false);
+
+        graphStatus.textContent =
+            "Server offline. Upload a CSV file above to view data on the graph.";
+    };
+
     const showError = (msg) => {
         errorMessage.textContent = msg;
         errorMessage.classList.remove("hidden");
@@ -69,17 +97,11 @@ document.addEventListener("DOMContentLoaded", () => {
             setEnabled(false);
             clearError();
 
-            const response = await fetch(`${API_BASE}/api/bpm/status`, {
-                cache: "no-store"
-            });
+            const status = await fetchExportStatus();
 
-            if (!response.ok) {
-                throw new Error("Could not contact the export server.");
-            }
+            markServerOnline();
 
-            const text = (await response.text()).trim();
-
-            if (text === "ready") {
+            if (status === "ready") {
                 statusText.textContent = "Export found. You can download it now.";
                 setEnabled(true);
                 fetchAndShowLatestCsv();
@@ -91,7 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         } catch (error) {
             console.error(error);
-            statusText.textContent = error.message || "Error checking export status.";
+            markServerOffline();
             setEnabled(false);
         }
     }
@@ -269,7 +291,8 @@ document.addEventListener("DOMContentLoaded", () => {
             renderBpmChart(points);
         } catch (err) {
             console.error(err);
-            graphStatus.textContent = "Error loading data: " + (err.message || "Unknown error");
+
+            markServerOffline();
         }
     }
 

@@ -14,16 +14,41 @@
         <button id="testUploadBtn">Upload test CSV (simulate watch)</button>
         <p>This site will allow you to download your exported heart rate CSV files.</p>
 
+        <!-- Server offline message -->
+        <p id="serverOfflineMessage" class="hidden server-warning">
+            The export server isn’t running. You can still upload a CSV and view it below.
+        </p>
+
         <h2>Upload a file</h2>
-
         <input type="file" id="csvUploadInput" accept=".csv">
-        <button id="uploadCsvFileBtn">Upload CSV File</button>
 
-        <h2>Your Exports</h2>
 
-        <p id="statusText">Checking for exported data…</p>
+        <!-- Server dependant resources -->
 
-        <button id="downloadAllBtn" disabled>Download full CSV</button>
+        <div id="serverDependentSection">
+            <button id="uploadCsvFileBtn">Upload CSV File</button>
+
+            <h2>Your Exports</h2>
+
+            <p id="statusText">Checking for exported data…</p>
+
+            <button id="downloadAllBtn" disabled>Download full CSV</button>
+
+            <h2>Export a date range</h2>
+
+            <form id="rangeForm">
+                <label>
+                    From:
+                    <input type="datetime-local" id="fromInput" required />
+                </label>
+                <label>
+                    To:
+                    <input type="datetime-local" id="toInput" required />
+                </label>
+                <button type="submit">Download CSV for range</button>
+            </form>
+
+        </div>
 
         <h2>Latest BPM data</h2>
         <p id="graphStatus">No data received yet.</p>
@@ -34,20 +59,6 @@
         </p>
 
         <button id="downloadSelectedBtn" disabled>Download selected range</button>
-
-        <h2>Export a date range</h2>
-
-        <form id="rangeForm">
-            <label>
-                From:
-                <input type="datetime-local" id="fromInput" required />
-            </label>
-            <label>
-                To:
-                <input type="datetime-local" id="toInput" required />
-            </label>
-            <button type="submit">Download CSV for range</button>
-        </form>
 
         <p id="errorMessage" class="hidden"></p>
 

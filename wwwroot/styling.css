@@ -46,3 +46,11 @@ button:hover {
     margin: 0 auto;
     width: 90%;
 }
+
+.server-warning {
+    background: #2d1b1b;
+    border: 1px solid #ff7b72;
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin-top: 16px;
+}
